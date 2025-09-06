@@ -1,25 +1,26 @@
 "use client";
 
 import { SignInButton } from "@clerk/nextjs";
-import { SignedIn, SignedOut, useUser } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useUser, useAuth } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 
 export default function LoginPage() {
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [tokenSent, setTokenSent] = useState(false);
   const [sendingToken, setSendingToken] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Function to send token to backend
   const sendTokenToBackend = async () => {
-    if (!user) return;
+    if (!user || !isLoaded) return;
     
     setSendingToken(true);
     setError(null);
     
     try {
       // Get the session token from Clerk
-      const token = await user.getToken();
+      const token = await getToken();
       
       if (!token) {
         throw new Error("No authentication token available");
@@ -34,11 +35,11 @@ export default function LoginPage() {
         body: JSON.stringify({
           token,
           userData: {
-            id: user.id,
-            email: user.emailAddresses[0]?.emailAddress,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            imageUrl: user.imageUrl,
+            id: user?.id,
+            email: user?.emailAddresses?.[0]?.emailAddress,
+            firstName: user?.firstName,
+            lastName: user?.lastName,
+            imageUrl: user?.imageUrl,
           },
         }),
       });
@@ -89,9 +90,18 @@ export default function LoginPage() {
         
         <SignedIn>
           <div className="text-center max-w-md">
-            <h1 className="text-2xl font-semibold text-black mb-4">
-              Welcome back, {user.firstName || user.emailAddresses[0]?.emailAddress}!
-            </h1>
+            {!isLoaded ? (
+              <div className="mb-4">
+                <div className="inline-flex items-center px-4 py-2 bg-gray-100 rounded-full">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
+                  <span className="text-gray-700">Loading user data...</span>
+                </div>
+              </div>
+            ) : (
+              <h1 className="text-2xl font-semibold text-black mb-4">
+                Welcome back, {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User'}!
+              </h1>
+            )}
             
             {sendingToken && (
               <div className="mb-4">
