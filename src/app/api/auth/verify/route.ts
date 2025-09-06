@@ -14,43 +14,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the request body to see if there's additional data
-    const body = await request.json();
+    // Get the request body
+    const { userData } = await request.json();
     
-    // Here you would send the token to your backend
-    // Replace this URL with your actual backend endpoint
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:8000/api/auth/verify";
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
     
-    const backendResponse = await fetch(backendUrl, {
-      method: "POST",
+    // First, try to login with the token (this will verify the token)
+    const loginResponse = await fetch(`${backendUrl}/auth/login`, {
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        token,
-        userData: body.userData || null,
-        timestamp: new Date().toISOString(),
-      }),
     });
 
-    if (backendResponse.ok) {
-      const backendData = await backendResponse.json();
-      return NextResponse.json({
-        success: true,
-        message: "Token sent to backend successfully",
-        backendResponse: backendData,
-      });
-    } else {
-      console.error("Backend error:", backendResponse.statusText);
+    if (!loginResponse.ok) {
+      const errorText = await loginResponse.text();
+      console.error("Backend login failed:", errorText);
       return NextResponse.json(
         { 
-          error: "Backend authentication failed",
-          status: backendResponse.status 
+          error: "Backend login failed", 
+          details: errorText 
         },
-        { status: backendResponse.status }
+        { status: loginResponse.status }
       );
     }
+
+    const loginData = await loginResponse.json();
+    
+    // Check if user exists in our database
+    const userCheckResponse = await fetch(`${backendUrl}/auth/user/${userData.email}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    let userData_response = null;
+    let isNewUser = false;
+    
+    if (userCheckResponse.ok) {
+      // User exists, return login data
+      userData_response = await userCheckResponse.json();
+    } else {
+      // User doesn't exist, create them
+      const signupResponse = await fetch(`${backendUrl}/auth/sign-up`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: userData.firstName || userData.email.split('@')[0],
+          email: userData.email,
+        }),
+      });
+
+      if (signupResponse.ok) {
+        userData_response = await signupResponse.json();
+        isNewUser = true;
+      } else {
+        const signupError = await signupResponse.text();
+        console.error("User creation failed:", signupError);
+        return NextResponse.json(
+          { 
+            error: "User creation failed", 
+            details: signupError 
+          },
+          { status: signupResponse.status }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: isNewUser ? "User created and authenticated successfully" : "User authenticated successfully",
+      clerkData: loginData,
+      userData: userData_response,
+      isNewUser
+    });
+
   } catch (error) {
     console.error("Error in auth verification:", error);
     return NextResponse.json(

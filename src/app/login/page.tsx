@@ -7,15 +7,16 @@ import { useEffect, useState } from "react";
 export default function LoginPage() {
   const { user, isLoaded } = useUser();
   const { getToken } = useAuth();
-  const [tokenSent, setTokenSent] = useState(false);
-  const [sendingToken, setSendingToken] = useState(false);
+  const [authStatus, setAuthStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [userData, setUserData] = useState<any>(null);
+  const [isNewUser, setIsNewUser] = useState(false);
 
-  // Function to send token to backend
-  const sendTokenToBackend = async () => {
-    if (!user || !isLoaded) return;
+  // Function to authenticate with backend
+  const authenticateWithBackend = async () => {
+    if (!user || !isLoaded || authStatus === 'loading') return;
     
-    setSendingToken(true);
+    setAuthStatus('loading');
     setError(null);
     
     try {
@@ -33,7 +34,6 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          token,
           userData: {
             id: user?.id,
             email: user?.emailAddresses?.[0]?.emailAddress,
@@ -46,33 +46,34 @@ export default function LoginPage() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Token sent successfully:", data);
-        setTokenSent(true);
+        console.log("Authentication successful:", data);
+        setUserData(data.userData);
+        setIsNewUser(data.isNewUser);
+        setAuthStatus('success');
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to send token to backend");
+        throw new Error(errorData.error || "Failed to authenticate with backend");
       }
     } catch (err) {
-      console.error("Error sending token:", err);
+      console.error("Error authenticating:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setSendingToken(false);
+      setAuthStatus('error');
     }
   };
 
-  // Automatically send token when user is signed in
+  // Automatically authenticate when user is signed in
   useEffect(() => {
-    if (isLoaded && user && !tokenSent && !sendingToken) {
-      sendTokenToBackend();
+    if (isLoaded && user && authStatus === 'idle') {
+      authenticateWithBackend();
     }
-  }, [isLoaded, user, tokenSent, sendingToken]);
+  }, [isLoaded, user, authStatus]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-950">
       <div className="text-center">
         <SignedOut>
           <SignInButton mode="modal">
-            <button className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-medium text-black bg-white border-2 border-black rounded-full transition-all duration-300 ease-in-out hover:bg-black hover:text-white hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2">
+            <button className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-medium text-white bg-neutral-800 border-2 border-neutral-700 rounded-full transition-all duration-300 ease-in-out hover:bg-neutral-700 hover:border-neutral-600 hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-neutral-600 focus:ring-offset-2 focus:ring-offset-neutral-950">
               <svg 
                 className="w-6 h-6 mr-3 transition-transform duration-300 group-hover:scale-110" 
                 viewBox="0 0 24 24" 
@@ -92,40 +93,40 @@ export default function LoginPage() {
           <div className="text-center max-w-md">
             {!isLoaded ? (
               <div className="mb-4">
-                <div className="inline-flex items-center px-4 py-2 bg-gray-100 rounded-full">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-                  <span className="text-gray-700">Loading user data...</span>
+                <div className="inline-flex items-center px-4 py-2 bg-neutral-800 rounded-full">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-300 mr-2"></div>
+                  <span className="text-neutral-300">Loading user data...</span>
                 </div>
               </div>
             ) : (
-              <h1 className="text-2xl font-semibold text-black mb-4">
-                Welcome back, {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User'}!
+              <h1 className="text-2xl font-semibold text-neutral-50 mb-4">
+                {isNewUser ? 'Welcome!' : 'Welcome back!'}, {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User'}!
               </h1>
             )}
             
-            {sendingToken && (
+            {authStatus === 'loading' && (
               <div className="mb-4">
-                <div className="inline-flex items-center px-4 py-2 bg-gray-100 rounded-full">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-                  <span className="text-gray-700">Sending token to backend...</span>
+                <div className="inline-flex items-center px-4 py-2 bg-neutral-800 rounded-full">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-300 mr-2"></div>
+                  <span className="text-neutral-300">Authenticating with backend...</span>
                 </div>
               </div>
             )}
             
-            {tokenSent && (
+            {authStatus === 'success' && (
               <div className="mb-4">
-                <div className="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full">
+                <div className="inline-flex items-center px-4 py-2 bg-green-900 text-green-300 rounded-full">
                   <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  Token sent successfully!
+                  {isNewUser ? 'Account created and authenticated successfully!' : 'Authenticated successfully!'}
                 </div>
               </div>
             )}
             
-            {error && (
+            {authStatus === 'error' && error && (
               <div className="mb-4">
-                <div className="inline-flex items-center px-4 py-2 bg-red-100 text-red-800 rounded-full">
+                <div className="inline-flex items-center px-4 py-2 bg-red-900 text-red-300 rounded-full">
                   <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
@@ -134,20 +135,36 @@ export default function LoginPage() {
               </div>
             )}
             
-            <div className="space-y-2 text-sm text-gray-600">
+            <div className="space-y-2 text-sm text-neutral-400">
               <p>You are successfully authenticated with Clerk.</p>
-              {tokenSent && (
-                <p>Your authentication token has been sent to the backend.</p>
+              {authStatus === 'success' && userData && (
+                <div className="mt-4 p-4 bg-neutral-800 rounded-lg">
+                  <p className="text-neutral-300 font-medium">Backend User Data:</p>
+                  <p className="text-neutral-400">Username: {userData.username}</p>
+                  <p className="text-neutral-400">Email: {userData.email}</p>
+                  <p className="text-neutral-400">User ID: {userData.id}</p>
+                </div>
               )}
             </div>
             
-            {error && (
+            {authStatus === 'error' && (
               <button
-                onClick={sendTokenToBackend}
-                className="mt-4 px-4 py-2 bg-black text-white rounded-full hover:bg-gray-800 transition-colors"
+                onClick={authenticateWithBackend}
+                className="mt-4 px-4 py-2 bg-neutral-700 text-neutral-200 rounded-full hover:bg-neutral-600 transition-colors"
               >
-                Retry sending token
+                Retry authentication
               </button>
+            )}
+            
+            {authStatus === 'success' && (
+              <div className="mt-6 space-y-2">
+                <a
+                  href="/team"
+                  className="inline-block px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                >
+                  Go to Team Board
+                </a>
+              </div>
             )}
           </div>
         </SignedIn>
