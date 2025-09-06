@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     
     const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
     
-    // First, try to login with the token (this will verify the token)
+    // First, verify the token with backend login endpoint
     const loginResponse = await fetch(`${backendUrl}/auth/login`, {
       method: "GET",
       headers: {
@@ -30,10 +30,10 @@ export async function POST(request: NextRequest) {
 
     if (!loginResponse.ok) {
       const errorText = await loginResponse.text();
-      console.error("Backend login failed:", errorText);
+      console.error("Backend token verification failed:", errorText);
       return NextResponse.json(
         { 
-          error: "Backend login failed", 
+          error: "Token verification failed", 
           details: errorText 
         },
         { status: loginResponse.status }
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const loginData = await loginResponse.json();
     
     // Check if user exists in our database
-    const userCheckResponse = await fetch(`${backendUrl}/auth/user/${userData.email}`, {
+    const userCheckResponse = await fetch(`${backendUrl}/auth/user/${encodeURIComponent(userData.email)}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -54,10 +54,13 @@ export async function POST(request: NextRequest) {
     let isNewUser = false;
     
     if (userCheckResponse.ok) {
-      // User exists, return login data
+      // User exists in database, return user data
       userData_response = await userCheckResponse.json();
+      console.log("Existing user found:", userData_response);
     } else {
-      // User doesn't exist, create them
+      // User doesn't exist in database, create them
+      console.log("User not found in database, creating new user...");
+      
       const signupResponse = await fetch(`${backendUrl}/auth/sign-up`, {
         method: "POST",
         headers: {
@@ -72,6 +75,7 @@ export async function POST(request: NextRequest) {
       if (signupResponse.ok) {
         userData_response = await signupResponse.json();
         isNewUser = true;
+        console.log("New user created:", userData_response);
       } else {
         const signupError = await signupResponse.text();
         console.error("User creation failed:", signupError);

@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [authStep, setAuthStep] = useState<string>('');
 
   // Function to authenticate with backend
   const authenticateWithBackend = async () => {
@@ -18,6 +19,7 @@ export default function LoginPage() {
     
     setAuthStatus('loading');
     setError(null);
+    setAuthStep('Getting authentication token...');
     
     try {
       // Get the session token from Clerk
@@ -26,6 +28,8 @@ export default function LoginPage() {
       if (!token) {
         throw new Error("No authentication token available");
       }
+
+      setAuthStep('Verifying token with backend...');
 
       // Send token to your backend via the API route
       const response = await fetch("/api/auth/verify", {
@@ -49,6 +53,7 @@ export default function LoginPage() {
         console.log("Authentication successful:", data);
         setUserData(data.userData);
         setIsNewUser(data.isNewUser);
+        setAuthStep('');
         setAuthStatus('success');
       } else {
         const errorData = await response.json();
@@ -57,6 +62,7 @@ export default function LoginPage() {
     } catch (err) {
       console.error("Error authenticating:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
+      setAuthStep('');
       setAuthStatus('error');
     }
   };
@@ -108,18 +114,22 @@ export default function LoginPage() {
               <div className="mb-4">
                 <div className="inline-flex items-center px-4 py-2 bg-neutral-800 rounded-full">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-300 mr-2"></div>
-                  <span className="text-neutral-300">Authenticating with backend...</span>
+                  <span className="text-neutral-300">{authStep || 'Processing...'}</span>
                 </div>
               </div>
             )}
             
             {authStatus === 'success' && (
               <div className="mb-4">
-                <div className="inline-flex items-center px-4 py-2 bg-green-900 text-green-300 rounded-full">
+                <div className={`inline-flex items-center px-4 py-2 rounded-full ${
+                  isNewUser 
+                    ? 'bg-blue-900 text-blue-300' 
+                    : 'bg-green-900 text-green-300'
+                }`}>
                   <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  {isNewUser ? 'Account created and authenticated successfully!' : 'Authenticated successfully!'}
+                  {isNewUser ? '🎉 Welcome! Account created and authenticated successfully!' : '✅ Welcome back! Authenticated successfully!'}
                 </div>
               </div>
             )}
@@ -139,10 +149,32 @@ export default function LoginPage() {
               <p>You are successfully authenticated with Clerk.</p>
               {authStatus === 'success' && userData && (
                 <div className="mt-4 p-4 bg-neutral-800 rounded-lg">
-                  <p className="text-neutral-300 font-medium">Backend User Data:</p>
-                  <p className="text-neutral-400">Username: {userData.username}</p>
-                  <p className="text-neutral-400">Email: {userData.email}</p>
-                  <p className="text-neutral-400">User ID: {userData.id}</p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`w-2 h-2 rounded-full ${isNewUser ? 'bg-blue-400' : 'bg-green-400'}`}></div>
+                    <p className="text-neutral-300 font-medium">
+                      {isNewUser ? 'New Account Created' : 'Existing Account Found'}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-neutral-500">Username:</span>
+                      <span className="text-neutral-300">{userData.username}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-500">Email:</span>
+                      <span className="text-neutral-300">{userData.email}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-500">User ID:</span>
+                      <span className="text-neutral-300 font-mono text-xs">{userData.id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-500">Created:</span>
+                      <span className="text-neutral-300">
+                        {new Date(userData.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
